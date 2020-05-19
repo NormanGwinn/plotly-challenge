@@ -1,25 +1,36 @@
+// This global variable will persist the data for the duration of the web application
 var participantData;
+
+// This is the initialization code.  
+//   Read data from the samples.json file.
+//   When the data is completely read:
+//     Populate the drop-down menu options.
+//     Store the data into a globally-scoped variable.
+//     Update the various charts on the page, with the data from the first participant.
 d3.json("static/data/samples.json").then(data => {
     console.log("Have Data")
     d3.select("#selDataset").html(data.names.map((sId, idx) => `<option value="${idx}">${sId}</option>`).join(""));
     participantData = data;
-    optionChanged();
+    optionChanged(0);
 });
 
-d3.select("#selDataset").on("change", optionChanged);
-
-function optionChanged() {
-  console.log('optionChanged');
-  let participantIndex = d3.select('select').property('value')
+// This is the event handler, specified in the index.html.
+// This function delegates the work to four other functions, one for each display panel.
+function optionChanged(participantIndex) {
   updateMetadata(participantIndex);
   updateBarChart(participantIndex);
   updateGauge(participantIndex);
   updateScatterPlot(participantIndex);
 }
 
+// Update the meta-data panel; the participant information
 function updateMetadata(participantIndex) {
-  let data2show = Object.entries(participantData.metadata[participantIndex]).map((entry) => `${entry[0]}:  ${entry[1]}`).slice(1,6);
+  // Construct a list of the meta-data items, omitting the first and last items
+  let data2show = Object.entries(participantData.metadata[participantIndex])
+                        .map((entry) => `${entry[0]}:  ${entry[1]}`)
+                        .slice(1,6);
   
+  // Use the enter and exit pattern to populate the meta-data panel
   let selection = d3.select("#sample-metadata").selectAll("li")
         .data(data2show);
 
@@ -31,24 +42,31 @@ function updateMetadata(participantIndex) {
   selection.exit().remove();
 }
 
+// Update the horizontal bar chart
 function updateBarChart(participantIndex) {
+  // Collect the data, labels, and hover text
   let bacteria_count = participantData.samples[participantIndex].sample_values.slice(0,10);
   let bacteria_id = participantData.samples[participantIndex].otu_ids.slice(0,10).map(id => "OTU-"+String(id));
   let bacteria_label = participantData.samples[participantIndex].otu_labels.slice(0,10);
+
+  // Set a chart title, appropriate for one or more sample bacteria
   let chart_title = `Top ${bacteria_count.length} Belly Button Bacteria`;
 
+  // Handle the special case where no samples are found in the dataset
   if (bacteria_count.length == 0) {
     bacteria_count.push(0.0);
     bacteria_id.push("(No Data) ");
     chart_title = "No Bacteria Counts Recorded";
   }
 
+  // If less than ten samples are found, synthesize "filler" data
   while (bacteria_count.length < 10) {
     bacteria_count.push(0.0);
     bacteria_id.push(" ".repeat(bacteria_count.length));
     bacteria_label.push("");
   }
 
+  // Plot the counts of the bacteria samples
   var trace1 = {
     type: "bar",
     orientation: "h",
@@ -56,6 +74,7 @@ function updateBarChart(participantIndex) {
     y: bacteria_id.reverse(),
     text: bacteria_label.reverse()
   };
+
   var layout = {
     title:  { text: chart_title, font: {size: 20} } ,
     xaxis: { title: 'Bacteria Count', rangemode: 'tozero'},
@@ -66,15 +85,22 @@ function updateBarChart(participantIndex) {
   Plotly.newPlot("bar", data, layout)
 }
 
+// Update the gauge
 function updateGauge(participantIndex) {
+  // Collect the data
   let washing_frequency_data = participantData.metadata[participantIndex].wfreq;
+  
+  // Convert the frequency to an integer
   let washing_frequency_display = Math.round(washing_frequency_data);
+
+  // Set a title, and handle the null data case
   let gauge_title = "Weekly Washing Frequency";
   if (washing_frequency_data == null) {
     washing_frequency_display = "";
     gauge_title += " is Unknown";
   }
 
+  // Create the gauge
   var data = [
     {
       domain: { x: [0, 1], y: [0, 1] },
@@ -125,12 +151,17 @@ function updateGauge(participantIndex) {
   Plotly.newPlot('gauge', data, layout);
 }
 
+// Update the scatter plot
 function updateScatterPlot(participantIndex) {
+  // Collect the data, labels, and hover text
   let bacteria_count = participantData.samples[participantIndex].sample_values;
   let bacteria_id = participantData.samples[participantIndex].otu_ids;
   let bacteria_label = participantData.samples[participantIndex].otu_labels;
+
+  // Set an appropriate chart title
   let chart_title = "Bacterial Spectrum" + (bacteria_count.length == 0 ? " (No Data)" : "");
 
+  // Plot the bacteria samples
   var trace1 = {
     type: "scatter",
     mode: "markers",
@@ -142,6 +173,7 @@ function updateScatterPlot(participantIndex) {
       color: bacteria_id.map(id => `hsla(${0.1*id},100%,60%,0.8)`)
     }
   };
+
   var layout = {
     title: { text: chart_title, font: {size: 20} },
     xaxis: { title: 'Bacteria "OTU-" ID'},
